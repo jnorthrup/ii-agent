@@ -2,7 +2,7 @@
 
 import mimetypes
 import pymupdf
-import imghdr
+# import imghdr  # Removed in Python 3.14
 
 from pathlib import Path
 from typing import Optional, Any

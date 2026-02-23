@@ -226,7 +226,7 @@ def _init_admin_settings():
         logger.error(f"Failed to seed admin LLM settings during initialization: {e}")
 
 
-run_migrations()
+#run_migrations  # Disabled for SQLite compatibility()
 
 # Parse the database URL to handle SSL parameters for asyncpg
 database_url = config.database_url
