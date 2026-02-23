@@ -1,162 +1,182 @@
-"""Google Cloud Storage provider implementation."""
+"""
+Google Cloud Storage implementation.
 
-import io
-import requests
-import datetime
-from typing import BinaryIO
-from google.cloud import storage
+Uses credentials from:
+1. GOOGLE_APPLICATION_CREDENTIALS environment variable
+2. gcloud application default credentials (~/.config/gcloud/)
+3. GOOGLE_CREDENTIALS environment variable (JSON string)
+"""
+
+import os
+import json
+from pathlib import Path
+from typing import Optional
+
 from .base import BaseStorage
 
 
 class GCS(BaseStorage):
-    """Google Cloud Storage provider for file storage."""
+    """Google Cloud Storage backend."""
 
     def __init__(
-        self, project_id: str, bucket_name: str, custom_domain: str | None = None
+        self,
+        project_id: str = "",
+        bucket_name: str = "",
+        custom_domain: Optional[str] = None,
     ):
-        self.client = storage.Client(project=project_id)
-        self.bucket = self.client.bucket(bucket_name)
+        """Initialize GCS storage.
+        
+        Credentials are loaded automatically from:
+        1. GOOGLE_APPLICATION_CREDENTIALS env var (path to credentials JSON)
+        2. gcloud ADC (~/.config/gcloud/application_default_credentials.json)
+        3. GOOGLE_CREDENTIALS env var (JSON string)
+        
+        Args:
+            project_id: GCP project ID (optional, auto-detected if not provided)
+            bucket_name: GCS bucket name
+            custom_domain: Custom domain for public URLs (optional)
+        """
+        from google.cloud import storage as gcs_storage
+        
+        self.bucket_name = bucket_name
         self.custom_domain = custom_domain
+        
+        # Initialize GCS client with automatic credential detection
+        self.client = self._create_gcs_client(project_id, gcs_storage)
+        self.bucket = self.client.bucket(bucket_name)
 
-    def write(
-        self, content: BinaryIO, path: str, content_type: str | None = None
-    ) -> str:
-        # Get a reference to the blob (i.e., the file in GCS)
-        blob = self.bucket.blob(path)
-
-        # Reset file pointer to the beginning before uploading
-        content.seek(0)
-
-        blob.upload_from_file(content, content_type=content_type)
-
-        return blob.public_url
-
-    def write_from_url(
-        self, url: str, path: str, content_type: str | None = None
-    ) -> str:
-        blob = self.bucket.blob(path)
-        with requests.get(url, stream=True) as response:
-            response.raise_for_status()
-            blob.upload_from_file(response.raw, content_type=content_type)
-
-        return blob.public_url
-
-    def read(self, path: str) -> BinaryIO:
-        blob = self.bucket.blob(path)
-        if not blob.exists():
-            raise FileNotFoundError(
-                f"File '{path}' not found in bucket '{self.bucket.name}'."
+    def _create_gcs_client(self, project_id: str, gcs_storage):
+        """Create GCS client with credential auto-detection."""
+        
+        # Try GOOGLE_APPLICATION_CREDENTIALS first
+        credentials_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+        if credentials_path and Path(credentials_path).exists():
+            from google.oauth2 import service_account
+            credentials = service_account.Credentials.from_service_account_file(
+                credentials_path
             )
-
-        # Create an in-memory binary stream to hold the file data.
-        file_obj = io.BytesIO()
-
-        blob.download_to_file(file_obj)
-
-        # Reset the stream's position to the beginning so it can be read from.
-        file_obj.seek(0)
-
-        return file_obj
-
-    def get_download_signed_url(
-        self, path: str, expiration_seconds: int = 3600
-    ) -> str | None:
-        blob = self.bucket.blob(path)
-
-        if not blob.exists():
-            raise FileNotFoundError(
-                f"File '{path}' not found in bucket '{self.bucket_name}'."
+            return gcs_storage.Client(
+                project=project_id or credentials.project_id,
+                credentials=credentials
             )
+        
+        # Try GOOGLE_CREDENTIALS (JSON string)
+        credentials_json = os.environ.get('GOOGLE_CREDENTIALS')
+        if credentials_json:
+            from google.oauth2 import service_account
+            credentials_info = json.loads(credentials_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                credentials_info
+            )
+            return gcs_storage.Client(
+                project=project_id or credentials_info.get('project_id'),
+                credentials=credentials
+            )
+        
+        # Fall back to gcloud ADC (Application Default Credentials)
+        # This uses ~/.config/gcloud/application_default_credentials.json
+        return gcs_storage.Client(project=project_id)
 
-        # Generate the signed URL
-        url = blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(seconds=expiration_seconds),
-            method="GET",
-        )
+    async def upload(self, file_path: str, content: bytes) -> str:
+        """Upload a file to GCS."""
+        blob = self.bucket.blob(file_path)
+        blob.upload_from_string(content)
+        return f"gs://{self.bucket_name}/{file_path}"
 
-        return url
+    async def download(self, file_path: str) -> bytes:
+        """Download a file from GCS."""
+        blob = self.bucket.blob(file_path)
+        return blob.download_as_bytes()
 
-    def get_upload_signed_url(
-        self, path: str, content_type: str, expiration_seconds: int = 3600
-    ) -> str | None:
-        blob = self.bucket.blob(path)
+    async def delete(self, file_path: str) -> bool:
+        """Delete a file from GCS."""
+        blob = self.bucket.blob(file_path)
+        if blob.exists():
+            blob.delete()
+            return True
+        return False
 
-        # Generate the signed URL for a PUT request
-        url = blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(seconds=expiration_seconds),
-            method="PUT",
-            content_type=content_type,
-        )
-
-        return url
-
-    def is_exists(self, path: str) -> bool:
-        blob = self.bucket.blob(path)
+    async def exists(self, file_path: str) -> bool:
+        """Check if a file exists in GCS."""
+        blob = self.bucket.blob(file_path)
         return blob.exists()
 
-    def get_file_size(self, path: str) -> int:
-        blob = self.bucket.blob(path)
-        if not blob.exists():
-            raise FileNotFoundError(
-                f"File '{path}' not found in bucket '{self.bucket.name}'."
-            )
-        blob.reload()
-        return blob.size
+    async def is_exists(self, file_path: str) -> bool:
+        return await self.exists(file_path)
 
-    def get_public_url(self, path: str) -> str:
-        # NOTE: assume that the blob is already public
-        blob = self.bucket.blob(path)
-        if not blob.exists():
-            raise FileNotFoundError(
-                f"File '{path}' not found in bucket '{self.bucket.name}'."
-            )
+    async def get_url(self, file_path: str) -> str:
+        """Get GCS URL for a file."""
+        if self.custom_domain:
+            return f"https://{self.custom_domain}/{file_path}"
+        return f"gs://{self.bucket_name}/{file_path}"
 
+    async def get_public_url(self, file_path: str) -> str:
+        """Get public URL (makes blob public first)."""
+        blob = self.bucket.blob(file_path)
+        if not blob.public_url:
+            blob.make_public()
         return blob.public_url
 
-    def get_permanent_url(self, path: str) -> str:
-        """Get permanent URL using custom domain or standard public URL."""
-        blob = self.bucket.blob(path)
-        if not blob.exists():
-            raise FileNotFoundError(
-                f"File '{path}' not found in bucket '{self.bucket.name}'."
-            )
+    async def get_permanent_url(self, file_path: str) -> str:
+        """Get permanent URL (same as public URL)."""
+        return await self.get_public_url(file_path)
 
-        # Make blob public if it isn't already
-        try:
-            blob.make_public()
-        except Exception:
-            # If already public or permission error, continue
-            pass
-
-        if self.custom_domain:
-            return f"https://{self.custom_domain}/{path}"
-        else:
-            return blob.public_url
-
-    def upload_and_get_permanent_url(
-        self, content: BinaryIO, path: str, content_type: str | None = None
+    async def get_download_signed_url(
+        self, 
+        file_path: str, 
+        expiration: int = 3600
     ) -> str:
-        """Upload file and return permanent URL."""
-        # Upload the file
-        blob = self.bucket.blob(path)
-        content.seek(0)
-        blob.upload_from_file(content, content_type=content_type)
+        """Get signed URL for downloading."""
+        blob = self.bucket.blob(file_path)
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=expiration,
+            method="GET"
+        )
 
-        # Set cache control for better CDN performance
-        blob.cache_control = "public, max-age=31536000"  # Cache for 1 year
-        blob.patch()
+    async def get_upload_signed_url(
+        self, 
+        file_path: str, 
+        expiration: int = 3600
+    ) -> str:
+        """Get signed URL for uploading."""
+        blob = self.bucket.blob(file_path)
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=expiration,
+            method="PUT"
+        )
 
-        # Make the file publicly accessible
-        try:
-            blob.make_public()
-        except Exception:
-            # If already public or permission error, continue
-            pass
+    async def get_file_size(self, file_path: str) -> int:
+        """Get file size in bytes."""
+        blob = self.bucket.blob(file_path)
+        if blob.exists():
+            blob.reload()
+            return blob.size
+        return 0
 
-        # Return permanent URL
-        if self.custom_domain:
-            return f"https://{self.custom_domain}/{path}"
-        else:
-            return blob.public_url
+    async def list_files(self, prefix: str = "") -> list[str]:
+        """List files in GCS bucket."""
+        blobs = self.bucket.list_blobs(prefix=prefix)
+        return [blob.name for blob in blobs]
+
+    async def read(self, file_path: str) -> bytes:
+        """Read file content."""
+        return await self.download(file_path)
+
+    async def write(self, file_path: str, content: bytes) -> str:
+        """Write content to file."""
+        return await self.upload(file_path, content)
+
+    async def upload_and_get_permanent_url(self, file_path: str, content: bytes) -> str:
+        """Upload and get permanent URL."""
+        await self.upload(file_path, content)
+        return await self.get_permanent_url(file_path)
+
+    async def write_from_url(self, file_path: str, url: str) -> str:
+        """Download from URL and upload to GCS."""
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return await self.upload(file_path, response.content)

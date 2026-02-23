@@ -1,7 +1,11 @@
-"""Local file storage implementation."""
+"""
+Local and GCS file storage implementation.
+
+Supports both local file storage and Google Cloud Storage.
+GCS credentials are loaded from environment or gcloud ADC.
+"""
 
 import os
-import shutil
 from pathlib import Path
 from typing import Optional
 
