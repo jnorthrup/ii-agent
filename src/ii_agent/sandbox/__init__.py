@@ -2,6 +2,7 @@ from .base_sandbox import BaseSandbox
 from .docker_sandbox import DockerSandbox
 from .e2b_sandbox import E2BSandbox
 from .local_sandbox import LocalSandbox
+from .tart_sandbox import TartSandbox
 from .sandbox_registry import SandboxRegistry
 
 __all__ = [
@@ -9,5 +10,6 @@ __all__ = [
     "DockerSandbox",
     "E2BSandbox",
     "LocalSandbox",
+    "TartSandbox",
     "SandboxRegistry",
 ]

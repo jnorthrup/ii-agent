@@ -14,6 +14,7 @@ class WorkSpaceMode(Enum):
     DOCKER = "docker"
     E2B = "e2b"
     LOCAL = "local"
+    TART = "tart"
 
     def __str__(self):
         return self.value

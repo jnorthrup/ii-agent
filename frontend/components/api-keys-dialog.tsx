@@ -133,6 +133,7 @@ const ApiKeysDialog = ({
   const [isLoading, setIsLoading] = useState(false);
   // const [showFirecrawlBaseUrl, setShowFirecrawlBaseUrl] = useState(false); // Add state for toggle
 
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
   // Add state for media provider selection
   const [mediaProvider, setMediaProvider] = useState<"vertex" | "gemini">(
     mediaConfig.gcp_project_id ? "vertex" : "gemini"
@@ -195,20 +196,19 @@ const ApiKeysDialog = ({
 
       if (data.search_config) {
         setSearchConfig({
-          firecrawl_api_key: data.search_config.firecrawl_api_key || undefined,
-          firecrawl_base_url:
-            data.search_config.firecrawl_base_url || undefined,
-          serpapi_api_key: data.search_config.serpapi_api_key || undefined,
-          tavily_api_key: data.search_config.tavily_api_key || undefined,
-          jina_api_key: data.search_config.jina_api_key || undefined,
+          firecrawl_api_key: data.search_config.firecrawl_api_key || "",
+          firecrawl_base_url: data.search_config.firecrawl_base_url || "",
+          serpapi_api_key: data.search_config.serpapi_api_key || "",
+          tavily_api_key: data.search_config.tavily_api_key || "",
+          jina_api_key: data.search_config.jina_api_key || "",
         });
       }
 
       if (data.media_config) {
         setMediaConfig({
-          gcp_project_id: data.media_config.gcp_project_id || undefined,
-          gcp_location: data.media_config.gcp_location || undefined,
-          gcs_output_bucket: data.media_config.gcs_output_bucket || undefined,
+          gcp_project_id: data.media_config.gcp_project_id || "",
+          gcp_location: data.media_config.gcp_location || "",
+          gcs_output_bucket: data.media_config.gcs_output_bucket || "",
           google_ai_studio_api_key:
             data.media_config.google_ai_studio_api_key || undefined,
         });
@@ -223,28 +223,28 @@ const ApiKeysDialog = ({
 
       if (data.audio_config) {
         setAudioConfig({
-          openai_api_key: data.audio_config.openai_api_key || undefined,
-          azure_endpoint: data.audio_config.azure_endpoint || undefined,
-          azure_api_version: data.audio_config.azure_api_version || undefined,
+          openai_api_key: data.audio_config.openai_api_key || "",
+          azure_endpoint: data.audio_config.azure_endpoint || "",
+          azure_api_version: data.audio_config.azure_api_version || "",
         });
       }
 
       if (data.third_party_integration_config) {
         setThirdPartyIntegrationConfig({
           neon_db_api_key:
-            data.third_party_integration_config.neon_db_api_key || undefined,
+            data.third_party_integration_config.neon_db_api_key || "",
           openai_api_key:
-            data.third_party_integration_config.openai_api_key || undefined,
+            data.third_party_integration_config.openai_api_key || "",
           vercel_api_key:
-            data.third_party_integration_config.vercel_api_key || undefined,
+            data.third_party_integration_config.vercel_api_key || "",
         });
       }
 
       if (data.sandbox_config) {
         setSandboxConfig({
           mode: data.sandbox_config.mode || "local",
-          template_id: data.sandbox_config.template_id || undefined,
-          sandbox_api_key: data.sandbox_config.sandbox_api_key || undefined,
+          template_id: data.sandbox_config.template_id || "",
+          sandbox_api_key: data.sandbox_config.sandbox_api_key || "",
         });
       }
     } catch (error) {
@@ -1224,6 +1224,19 @@ const ApiKeysDialog = ({
                     }
                   />
                 </div>
+                {editingConfig?.config.base_url && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-[#ffffff0f] mt-2"
+                    onClick={fetchProxyModels}
+                    disabled={isFetchingModels}
+                  >
+                    {isFetchingModels
+                      ? "Discovering..."
+                      : "Auto-discover Models from Proxy"}
+                  </Button>
+                )}
               </div>
             )}
 

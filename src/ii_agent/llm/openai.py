@@ -63,6 +63,15 @@ class OpenAIDirectClient(LLMClient):
         self.max_retries = llm_config.max_retries
         self.cot_model = llm_config.cot_model
 
+    def list_models(self) -> list[str]:
+        """List available models from the API."""
+        try:
+            models = self.client.models.list()
+            return [model.id for model in models]
+        except Exception as e:
+            logger.error(f"Failed to list models: {e}")
+            return []
+
     def generate(
         self,
         messages: LLMMessages,

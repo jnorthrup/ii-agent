@@ -219,11 +219,12 @@ class TerminalClient:
         elif (
             settings.sandbox_config.mode == WorkSpaceMode.E2B
             or settings.sandbox_config.mode == WorkSpaceMode.DOCKER
+            or settings.sandbox_config.mode == WorkSpaceMode.TART
         ):
             self._client = RemoteTerminalClient(self.config)
         else:
             raise ValueError(
-                f"Unsupported mode: {self.config.mode}. Must be 'local' or 'remote' or 'e2b'"
+                f"Unsupported mode: {settings.sandbox_config.mode}. Must be 'local', 'docker', 'e2b' or 'tart'"
             )
 
     def create_session(self, session_id: str) -> SessionResult:

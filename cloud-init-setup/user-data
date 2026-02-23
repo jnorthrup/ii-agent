@@ -1,0 +1,8 @@
+#cloud-config
+users:
+  - name: ubuntu
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDRmqkp3CFjqoaQZstJIGlfcPJvbOdP4IyMyZ5ogzPLHX3jtRCpVqRmk5qlBNtmfrL8dAk9tHI/BEL9A3gEzU7tV/nJNcgTGDd33aFko2ONGGbvlUnCU6ePu3f9YP544Ucp2FN21vmtsx2GkHfd42YEjG+MdnE1cIqLfWjsLpq88jT+5RkEG+LZUPr0t4tTT7rTzj3HWrNOEEAyEwMJWBNP4b+5ruvZlthbfYTbG+K2c+F3P2Iv+wGJFBVr1Hjfe4CmNEic8hvA0Hpa33STX6fiaECKo6CnUImF4H5/3yXbpB8+Jg+64od5VjTFFKH9gDSsfycPaBaIpimXP+Ez9Slb jim@jim-Lenovo-ideapad-Y900-17ISK
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash

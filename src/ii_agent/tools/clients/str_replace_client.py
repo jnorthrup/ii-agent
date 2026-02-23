@@ -251,6 +251,7 @@ class StrReplaceClient:
         elif (
             settings.sandbox_config.mode == WorkSpaceMode.DOCKER
             or settings.sandbox_config.mode == WorkSpaceMode.E2B
+            or settings.sandbox_config.mode == WorkSpaceMode.TART
         ):
             self._client = RemoteStrReplaceClient(self.config)
         else:

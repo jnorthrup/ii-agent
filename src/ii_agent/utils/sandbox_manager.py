@@ -30,7 +30,9 @@ class SandboxManager:
         await self.sandbox.connect()
 
     async def stop_sandbox(self):
-        pass
+        if self.sandbox:
+            await self.sandbox.stop()
 
     async def cleanup_sandbox(self):
-        pass
+        if self.sandbox:
+            await self.sandbox.cleanup()
